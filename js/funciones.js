@@ -1,6 +1,7 @@
-import { formulario, contenedorForm, listadoClientes } from './selectores.js';
+import { inputNombre, inputCorreo, inputTelefono, inputEmpresa, formulario, contenedorForm, listadoClientes } from './selectores.js';
 
 let DB;
+let idCliente;
 
 // Crear la base de datos de IndexDB
 function crearDB() {
@@ -31,28 +32,15 @@ function crearDB() {
    }
 }
 
-// Conectar a la base de datos
-function conectarDB() {
-   const abrirConexion = window.indexedDB.open('crm',1);
-
-   abrirConexion.onerror = function() {
-      console.log('Ocurrio un error al tratar de conectar a la base de datos');
-   }
-
-   abrirConexion.onsuccess = function() {
-      DB = abrirConexion.result;
-   }
-}
-
 // Validacion de formulario
 function validarCliente(e) {
    e.preventDefault();
    
    // Leer todos los inputs
-   const nombre = document.querySelector('#nombre').value;
-   const correo = document.querySelector('#email').value;
-   const telefono = document.querySelector('#telefono').value;
-   const empresa = document.querySelector('#empresa').value;
+   const nombre = inputNombre.value;
+   const correo = inputCorreo.value;
+   const telefono = inputTelefono.value;
+   const empresa = inputEmpresa.value;
 
    if (!nombre || !correo || !telefono || !empresa) {
       imprimirAlerta('Todos los campos son obligatorios', 'error');
@@ -70,7 +58,7 @@ function imprimirAlerta(mensaje, tipo) {
 
    if (!alerta) {
       const divMensaje = document.createElement('div');
-      divMensaje.classList.add('px-4','py-3','rounded','max-w-lg','mx-auto','mt-6','text-center','sticky','bottom-0','alerta');
+      divMensaje.classList.add('px-4','py-3','rounded','max-w-lg','mx-auto','mt-6','text-center','alerta');
 
       if (tipo === 'error') {
          divMensaje.classList.add('bg-red-200','text-red-700');
@@ -96,19 +84,28 @@ function generarId() {
 
 // Agregar un cliente a la base de datos
 function agregarCliente(cliente) {
-   const transaction = DB.transaction(['crm'], 'readwrite');
+   const abrirConexion = window.indexedDB.open('crm',1);
 
-   const objectStore = transaction.objectStore('crm');
-
-   objectStore.add(cliente);
-
-   transaction.onerror = function() {
-      imprimirAlerta('Ocurrio un error al tratar de agregar el cliente', 'error');
+   abrirConexion.onerror = function() {
+      console.log('Ocurrio un error al tratar de conectar a la base de datos');
    }
 
-   transaction.oncomplete = function() {
-      imprimirAlerta('Cliente agregado correctamente','exito');
-      formulario.reset();
+   abrirConexion.onsuccess = function() {
+      DB = abrirConexion.result;
+      const transaction = DB.transaction(['crm'], 'readwrite');
+
+      const objectStore = transaction.objectStore('crm');
+
+      objectStore.add(cliente);
+
+      transaction.onerror = function() {
+         imprimirAlerta('Ocurrio un error al tratar de agregar el cliente', 'error');
+      }
+
+      transaction.oncomplete = function() {
+         imprimirAlerta('Cliente agregado correctamente','exito');
+         formulario.reset();
+      }
    }
 }
 
@@ -159,15 +156,15 @@ function mostrarClientes() {
             accionesCliente.classList.add('px-6','py-4','border-b', 'border-gray-200');
             // Boton para eliminar cliente
             const btnEliminar = document.createElement('button');
-            btnEliminar.classList.add('bg-red-200','text-red-700','mr-2','px-3','py-1','hover:bg-red-400');
+            btnEliminar.classList.add('bg-red-200','text-red-700','mr-2','px-3','py-2','hover:bg-red-400','leading-tight');
             btnEliminar.textContent = 'Eliminar';
             btnEliminar.onclick = () => eliminarCliente(id);
 
             // Boton para editar cliente
-            const btnEditar = document.createElement('button');
-            btnEditar.classList.add('bg-blue-200','text-blue-700','px-3','py-1','hover:bg-blue-400');
+            const btnEditar = document.createElement('a');
+            btnEditar.classList.add('bg-blue-200','text-blue-700','px-3','py-2','hover:bg-blue-400');
+            btnEditar.href = `editar-cliente.html?id=${id}`;
             btnEditar.textContent = 'Editar';
-            btnEditar.onclick = () => editarCliente(id);
 
             accionesCliente.appendChild(btnEliminar);
             accionesCliente.appendChild(btnEditar);
@@ -189,12 +186,73 @@ function mostrarClientes() {
 
 }
 
+function obtenerDatosCliente() {
+   // Verificar el ID de la URL
+   const parametroURL = new URLSearchParams(window.location.search);
+   idCliente = parametroURL.get('id');
+   if(idCliente) {
+      const abrirConexion = window.indexedDB.open('crm',1);
+
+      abrirConexion.onerror = function() {
+         console.log('Error al tratar de conectar a la base de datos');
+      }
+      abrirConexion.onsuccess = function() {
+         DB = abrirConexion.result;
+         
+         const transaction = DB.transaction(['crm'], 'readwrite');
+         const objectStore = transaction.objectStore('crm');
+         
+         const cliente = objectStore.openCursor();
+         cliente.onsuccess = function(e) {
+            const cursor = e.target.result;
+            if (cursor) {
+               if (cursor.value.id === idCliente) {
+                  llenarFormulario(cursor.value);
+                  return;
+               }
+               cursor.continue();
+            }
+         }
+      }
+   }
+}
+
+function llenarFormulario(datosCliente) {
+   const { nombre, correo, telefono, empresa } = datosCliente;
+   inputNombre.value = nombre;
+   inputCorreo.value = correo;
+   inputTelefono.value = telefono;
+   inputEmpresa.value = empresa;
+}
+
 function eliminarCliente(id)  {
    console.log(`Eliminando al cliente ${id}`);
 }
 
-function editarCliente(id) {
-   console.log(`Editando al cliente ${id}`);
+function editarCliente(e) {
+   e.preventDefault();
+   const nombre = inputNombre.value;
+   const correo = inputCorreo.value;
+   const telefono = inputTelefono.value;
+   const empresa = inputEmpresa.value;
+   if ( !nombre || !correo || !telefono || !empresa ) {
+      imprimirAlerta('Todos los campos son obligatorios', 'error');
+      return;
+   }
+
+   // Actualizar cliente
+   const clienteActualizado = { nombre, correo, telefono, empresa, id: idCliente };
+   
+   const transaction = DB.transaction(['crm'], 'readwrite');
+   const objectStore = transaction.objectStore('crm');
+   objectStore.put(clienteActualizado);
+   transaction.onerror = function() {
+      imprimirAlerta('Ocurrio un error al tratar de editar el cliente', 'error');
+   }
+
+   transaction.oncomplete = function() {
+      imprimirAlerta('Cliente actualizado correctamente','exito');
+   }
 }
 
-export { crearDB, conectarDB, validarCliente, mostrarClientes };
+export { crearDB, validarCliente, mostrarClientes, obtenerDatosCliente, editarCliente };
