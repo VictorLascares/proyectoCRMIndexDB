@@ -109,8 +109,15 @@ function agregarCliente(cliente) {
    }
 }
 
+function limpiarHTML()  {
+   while(listadoClientes.firstChild) {
+      listadoClientes.removeChild(listadoClientes.firstChild);
+   }
+}
+
 // Mostrar en pantalla los clientes agregados
 function mostrarClientes() {
+   limpiarHTML();
    const abrirConexion = window.indexedDB.open('crm',1);
 
    abrirConexion.onerror = function() {
@@ -226,7 +233,12 @@ function llenarFormulario(datosCliente) {
 }
 
 function eliminarCliente(id)  {
-   console.log(`Eliminando al cliente ${id}`);
+   const transaction = DB.transaction(['crm'], 'readwrite');
+   const objectStore = transaction.objectStore('crm'); 
+   objectStore.delete(id);
+   transaction.oncomplete = function() {
+      mostrarClientes();
+   }
 }
 
 function editarCliente(e) {
